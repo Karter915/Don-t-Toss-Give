@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Don't Toss, Give</title>
+    <style>
+        :root{--bg:#f6f7fb;--card:#ffffff;--muted:#666;--accent:#2b6ef6}
+        body{font-family:Inter,system-ui,Arial,Helvetica,sans-serif;background:var(--bg);color:#000;margin:0;padding:20px}
+        .container{max-width:980px;margin:0 auto}
+        header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+        h1{margin:0;font-size:20px}
+        .card{background:var(--card);border-radius:10px;padding:16px;box-shadow:0 6px 18px rgba(20,20,40,0.06);margin-bottom:16px;color:#000}
+        .row{display:flex;gap:12px}
+        .col{flex:1}
+        label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+        input[type=text], input[type=email], textarea, select{width:100%;padding:8px;border-radius:6px;border:1px solid #e3e6ef;background:#fff;color:#000}
+        button{background:var(--accent);color:#000;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+        button.secondary{background:#e6e8fb;color:#000}
+        .muted{color:var(--muted);font-size:13px}
+        nav{display:flex;gap:8px}
+        .link{background:transparent;border:1px solid #e6e9f5;padding:8px 10px;border-radius:8px;cursor:pointer;color:#000}
+        .posts-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+        .post{border:1px dashed #e6e9f5;padding:12px;border-radius:8px;background:#fff;color:#000}
+        .small{font-size:12px;color:var(--muted)}
+        .notice{background:#f0f0f0;padding:8px;border-radius:8px;margin-bottom:12px;color:#000}
+        footer{margin-top:24px;text-align:center;color:var(--muted);font-size:13px}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Don't Toss, Give</h1>
+            <div class="muted">Backend assumed at <code>http://localhost:3000</code></div>
+        </header>
+
+    <div class="card" id="landing">
+      <h2>Welcome</h2>
+      <p class="muted">Choose how you want to enter:</p>
+      <div class="row" style="margin-top:12px">
+        <div class="col">
+          <div class="card">
+            <h3>Admin Login</h3>
+            <p class="small">Password for Prototype: <strong>12345</strong> </p>
+            <label>Email</label>
+            <input id="adminEmail" type="email" placeholder="admin@example.com" />
+            <label>Admin Password</label>
+            <input id="adminPass" type="text" value="" placeholder="Enter 12345" />
+            <div style="margin-top:10px">
+              <button id="btnAdminLogin">Login as Admin</button>
+            </div>
+            <p class="small" style="margin-top:8px">(This Prototype treats any email + 12345 as admin.)</p>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="card">
+            <h3>User / Giver Login</h3>
+            <label>Email</label>
+            <input id="userEmail" type="email" placeholder="you@school.edu" />
+            <div style="margin-top:10px">
+              <button id="btnUserLogin">Login as User</button>
+            </div>
+            <p class="small" style="margin-top:8px">If it's a new email, role defaults to <em>student</em>. Admin can promote to <em>giver</em>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- This is the admin section HTML code  ------------------------------------------------------------------------------------------------------->
+    <div class="card" id="adminPanel" style="display:none">
+      <h2>Admin Dashboard</h2>
+      <p class="small">Promote a user by email to <strong>Giver</strong>.</p>
+      <label>Email to promote</label>
+      <input id="promoteEmail" type="email" placeholder="giver@domain.com" />
+      <div style="margin-top:10px">
+        <button id="btnPromote">Promote to Giver</button>
+        <button id="btnAdminLogout" style="margin-left:8px" class="link">Logout Admin</button>
+      </div>
+      <div id="adminMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <!-- This is the User section HTML code  ------------------------------------------------------------------------------------------------------->
+    <div class="card" id="userPanel" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 id="userTitle">User Dashboard</h2>
+        <div>
+          <button id="btnRefreshPosts" class="link">Refresh Posts</button>
+          <button id="btnLogout" class="link">Logout</button>
+        </div>
+      </div>
+
+      <div style="margin-top:8px" id="userInfo" class="small"></div>
+
+      <!-- This is the Giver section HTML code  ------------------------------------------------------------------------------------------------------->
+      <div id="giverSection" style="margin-top:12px;display:none">
+        <h3>Create a Post (Giver)</h3>
+        <label>Title</label>
+        <input id="postTitle" type="text" />
+        <label>Description</label>
+        <textarea id="postDesc" rows="3"></textarea>
+        <label>Pickup Window (e.g. 2:00-3:00pm)</label>
+        <input id="postWindow" type="text" />
+        <div style="margin-top:8px">
+          <button id="btnCreatePost">Create Post</button>
+        </div>
+        <div id="createMsg" class="small" style="margin-top:8px"></div>
+      </div>
+
+      <hr />
+      <h3>Available Posts</h3>
+      <div id="posts" class="posts-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000';
+
+    //Helper functions
+    function qs(id){return document.getElementById(id)}
+    function show(el){el.style.display='block'}
+    function hide(el){el.style.display='none'}
+
+    // Landing actions
+    qs('btnAdminLogin').onclick = async () => {
+      const email = qs('adminEmail').value.trim();
+      const password = qs('adminPass').value.trim();
+      if(!email) return alert('Enter admin email');
+
+      // From backend logic for password
+      const res = await fetch(API + '/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})});
+      if(res.ok){
+        localStorage.setItem('session','admin');
+        localStorage.setItem('email',email);
+        qs('adminPanel').style.display='block';
+        qs('landing').style.display='none';
+      } else {
+        alert('Admin login failed — password must be 12345');
+      }
+    }
+
+    qs('btnUserLogin').onclick = async () => {
+      const email = qs('userEmail').value.trim();
+      if(!email) return alert('Enter your email');
+      const res = await fetch(API + '/user/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email})});
+      const data = await res.json();
+      localStorage.setItem('session','user');
+      localStorage.setItem('email',email);
+      localStorage.setItem('role', data.user.role || 'student');
+      openUserPanel();
+    }
+
+    // Actions int he Admin Section
+    qs('btnPromote').onclick = async () => {
+      const email = qs('promoteEmail').value.trim();
+      if(!email) return alert('Enter email to promote');
+      const res = await fetch(API + '/admin/promote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email})});
+      const data = await res.json();
+      qs('adminMsg').innerText = data.message || JSON.stringify(data);
+    }
+
+    qs('btnAdminLogout').onclick = () => {
+      localStorage.removeItem('session');localStorage.removeItem('email');
+      qs('adminPanel').style.display='none';qs('landing').style.display='block';
+    }
+
+    // for the user panel
+    function openUserPanel(){
+      qs('landing').style.display='none';
+      qs('adminPanel').style.display='none';
+      qs('userPanel').style.display='block';
+      const email = localStorage.getItem('email');
+      const role = localStorage.getItem('role') || 'student';
+      qs('userInfo').innerText = `Signed in as ${email} — role: ${role}`;
+      if(role === 'giver') show(qs('giverSection')); else hide(qs('giverSection'));
+      loadPosts();
+    }
+
+    qs('btnLogout').onclick = () => {
+      localStorage.removeItem('session');localStorage.removeItem('email');localStorage.removeItem('role');
+      qs('userPanel').style.display='none';qs('landing').style.display='block';
+    }
+
+    qs('btnRefreshPosts').onclick = loadPosts;
+
+    qs('btnCreatePost').onclick = async () => {
+      const title = qs('postTitle').value.trim();
+      const desc = qs('postDesc').value.trim();
+      const window = qs('postWindow').value.trim();
+      const giverEmail = localStorage.getItem('email');
+      if(!title||!desc) return alert('Provide title and description');
+
+      const res = await fetch(API + '/giver/post',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({giverEmail,title,description:desc,window})});
+      const data = await res.json();
+      if(data.success){
+        qs('createMsg').innerText = 'Post created and students notified (server logs email).';
+        qs('postTitle').value='';qs('postDesc').value='';qs('postWindow').value='';
+        loadPosts();
+      } else {
+        qs('createMsg').innerText = JSON.stringify(data);
+      }
+    }
+
+    // Post loading section
+    async function loadPosts(){
+      const res = await fetch(API + '/posts');
+      const data = await res.json();
+      renderPosts(data || []);
+    }
+
+    function renderPosts(list){
+      const container = qs('posts');container.innerHTML = '';
+      if(!list.length) return container.innerHTML = '<div class="muted">No available posts right now.</div>';
+
+      list.forEach(p=>{
+        const box = document.createElement('div');box.className='post';
+        box.innerHTML = `
+          <strong>${escapeHtml(p.title)}</strong>
+          <div class="small">by ${p.giverEmail}</div>
+          <div style="margin-top:8px">${escapeHtml(p.description)}</div>
+          <div class="small" style="margin-top:8px">Window: ${escapeHtml(p.window||'n/a')}</div>
+          <div style="margin-top:10px"></div>
+        `;
+
+        const actions = box.querySelector('div:last-child');
+
+        //Request button for the student
+        const myEmail = localStorage.getItem('email');
+        const role = localStorage.getItem('role') || 'student';
+
+        const requestBtn = document.createElement('button'); requestBtn.textContent='Request Pickup';
+        requestBtn.onclick = async ()=>{
+          const time = prompt('Enter preferred pickup time (e.g. 2:10pm)');
+          if(!time) return;
+          const res = await fetch(API + '/student/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:myEmail,postId:p.id,time})});
+          const d = await res.json(); alert(d.message || JSON.stringify(d));
+        };
+
+        actions.appendChild(requestBtn);
+
+        // Button for demostration
+        const assignBtn = document.createElement('button'); assignBtn.textContent='Who is first?'; assignBtn.className='link';
+        assignBtn.onclick = async ()=>{
+          const res = await fetch(API + '/system/assign/' + p.id);
+          const d = await res.json();
+          if(d.success) alert(`Assigned: ${d.assignedTo} at ${d.time}`); else alert(d.message||JSON.stringify(d));
+        };
+        actions.appendChild(assignBtn);
+
+        //If the current user is the giver they see confirmation and reject button
+        if(myEmail && myEmail === p.giverEmail){
+            //confirm button
+            const confirmBtn = document.createElement('button'); 
+            confirmBtn.textContent='Confirm Pickup (close post)'; 
+            confirmBtn.style.marginLeft='8px';
+            confirmBtn.onclick = async ()=>{
+                const res = await fetch(API + '/giver/confirm',{
+                    method:'POST',
+                    headers:{'content-type':'application/json'},
+                    body:JSON.stringify({postId:p.id,giverEmail:myEmail})
+                });
+                const d = await res.json(); 
+                alert(d.message || JSON.stringify(d)); 
+
+                // Show student who was selected to for pickup
+                if(d.nextStudent){
+                    alert(`Student scheduled for pickup:\nEmail: ${d.nextStudent.studentEmail}\nPreferred time: ${d.nextStudent.time}\nSend them an email.`);
+                }
+
+                loadPosts(); 
+            };
+            actions.appendChild(confirmBtn);
+
+            // Reject first button
+            const rejectBtn = document.createElement('button'); 
+            rejectBtn.textContent='Reject First Request'; 
+            rejectBtn.style.marginLeft='8px';
+            rejectBtn.onclick = async ()=>{
+                const res = await fetch(API + '/giver/reject',{
+                    method:'POST',
+                    headers:{'content-type':'application/json'},
+                    body:JSON.stringify({postId:p.id,giverEmail:myEmail})
+                });
+                const d = await res.json(); 
+                alert(d.message || JSON.stringify(d)); 
+                loadPosts(); 
+            };
+            actions.appendChild(rejectBtn);
+        }
+
+        container.appendChild(box);
+      });
+    }
+
+    //escape for HTML
+    function escapeHtml(s){ if(!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // on a laod we check session here
+    (function init(){
+      const session = localStorage.getItem('session');
+      if(session === 'admin'){
+        qs('landing').style.display='none';qs('adminPanel').style.display='block';
+      } else if(session === 'user'){
+        // Get role for user
+        const email = localStorage.getItem('email');
+        if(email){
+          fetch(API + '/user/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email})}).then(r=>r.json()).then(d=>{localStorage.setItem('role',d.user.role||'student');openUserPanel()}).catch(()=>openUserPanel());
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
